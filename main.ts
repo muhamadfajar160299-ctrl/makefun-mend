@@ -616,19 +616,32 @@ function parseSearchReplace(lines: string[]): SRBlock[] {
         if (prevPath !== null) p = prevPath;
         else throw new ParseFault(searchIdx + 1);
       }
+      // The `=======` separator belongs to this block: a `>>>>>>> REPLACE`
+      // line or a new `<<<<<<< SEARCH` line before it means this block
+      // has none (SPEC section 7: parse error at the SEARCH line).
       let sep = -1;
       for (let j = searchIdx + 1; j < lines.length; j++) {
-        if (stripTrailingWs(lines[j]) === "=======") {
+        const t = stripTrailingWs(lines[j]);
+        if (t === "=======") {
           sep = j;
           break;
         }
+        if (t === ">>>>>>> REPLACE" || t === "<<<<<<< SEARCH") {
+          throw new ParseFault(searchIdx + 1);
+        }
       }
       if (sep === -1) throw new ParseFault(searchIdx + 1);
+      // Likewise the `>>>>>>> REPLACE` terminator belongs to this block:
+      // a new block starting before it leaves this block unterminated.
       let rep = -1;
       for (let j = sep + 1; j < lines.length; j++) {
-        if (stripTrailingWs(lines[j]) === ">>>>>>> REPLACE") {
+        const t = stripTrailingWs(lines[j]);
+        if (t === ">>>>>>> REPLACE") {
           rep = j;
           break;
+        }
+        if (t === "<<<<<<< SEARCH") {
+          throw new ParseFault(searchIdx + 1);
         }
       }
       if (rep === -1) throw new ParseFault(searchIdx + 1);
